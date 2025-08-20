@@ -34,3 +34,13 @@ curl -X POST http://localhost:6969/api/blogs \
 and automatically replace the Bearer field with whatever the first POST responds with.
 
 The solution leaves all responsibility for you to figure out how to handle the string processing, catbash just gives you the string as is (or stored to a file), and if you can figure out how to string process it from echo "{my output}", it allows you to do so. Alternatively you could manually modify the stored file, and then catbash that.
+
+For example to modify the Authorization bearer field on the captured response, you can type this monstrosity
+
+catbash -i 'echo "2"' -o test.txt -c -a '| echo "curl -X POST http://localhost:6969/api/blogs   -H \"Content-Type: application/json\"   -H \"Authorization: Bearer $(cat)\"   -d '"'"'{ "title": "Sample Blog Title", "author": "Sample Author", "url": "http://sampleurl.com" }'"'"'"'
+
+and it would replace the output to :
+
+curl -X POST http://localhost:6969/api/blogs   -H "Content-Type: application/json"   -H "Authorization: Bearer 2"   -d '{ title: Sample Blog Title, author: Sample Author, url: http://sampleurl.com }'
+
+In future, Im looking to make it so that any string manipulation you'd want to do can also be taken from a file and used as is, because having to type all that into terminal more than once to achieve that is a bit silly.
