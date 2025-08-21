@@ -40,15 +40,19 @@ Flag	                            Description
 
 ## Examples
 Simple useage:
+
 catbash my_script.sh 
 
 Storing a simple command for reuse to output
+
 catbash -i "ls -l" -o out.sh 
 
 Capturing and modifying the output of out.sh with arguments and displaying the result in stdout
+
 catbash -i "ls -l" -o out.sh -c -a "| grep txt"
 
 Capturing and modifying the output of out.sh with arguments and then storing the result to a file
+
 catbash -i "ls -l" -o out.sh -c -t out2.sh -a "| grep txt"
 
 Something more complex :
