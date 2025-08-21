@@ -45,6 +45,13 @@ struct Args {
     )]
     arguments: Option<String>,
 
+    #[arg(
+        short = 'f',
+        long,
+        help = "Same as arguments flag, with the exception the arguments are read from a file"
+    )]
+    arguments_from_file: Option<String>,
+
     // Positional arguments (non-flag arguments)
     #[arg(help = "Files to process with default behavior. Only 1 is expected for now")]
     files: Vec<String>,
@@ -151,6 +158,19 @@ fn validate_matches(matches: &ArgMatches, args_given: &Args) -> Result<(), Box<d
         );
     }
 
+    if matches.contains_id("arguments_from_file")
+        && (!matches.contains_id("output") || !args_given.capture)
+    {
+        return Err(
+            "Arguments from file flag requires an output file to catbash and capture flag to be present"
+                .into(),
+        );
+    }
+
+    if matches.contains_id("arguments") && matches.contains_id("arguments_from_file") {
+        return Err("Cannot provide arguments from -a and -f flags simultaneously".into());
+    }
+
     Ok(())
 }
 
@@ -205,8 +225,9 @@ fn handle_defined_flags(args: &Args) -> Result<(), Box<dyn Error>> {
         &args.capture,
         &args.target,
         &args.arguments,
+        &args.arguments_from_file,
     ) {
-        (Some(input), None, false, None, None) => {
+        (Some(input), None, false, None, None, None) => {
             println!(
                 "Avoid using -i flag alone, the application might not be able to create or remove the temporary file created to execute"
             );
@@ -216,40 +237,64 @@ fn handle_defined_flags(args: &Args) -> Result<(), Box<dyn Error>> {
             catbash(temp_path)?;
             delete_file(temp_path)?;
         }
-        (None, Some(output), false, None, None) => {
+        (None, Some(output), false, None, None, None) => {
             catbash(output)?;
         }
-        (Some(input), Some(output), false, None, None) => {
+        (Some(input), Some(output), false, None, None, None) => {
             write_to_file(input, output)?;
             catbash(output)?;
         }
-        (Some(input), Some(output), true, None, None) => {
+        (Some(input), Some(output), true, None, None, None) => {
             write_to_file(input, output)?;
             let _captured_value = capture_catbash(output, true)?;
         }
-        (Some(input), Some(output), true, Some(target), None) => {
+        (Some(input), Some(output), true, Some(target), None, None) => {
             write_to_file(input, output)?;
             let captured_value = capture_catbash(output, false)?;
             write_to_file(&captured_value, target)?;
         }
-        (None, Some(output), true, None, Some(arguments)) => {
+        (None, Some(output), true, None, Some(arguments), None) => {
             let captured_value = capture_catbash(output, false)?;
             let _modified_value = execute_arguments(&captured_value, arguments, true)?;
         }
-        (None, Some(output), true, Some(target), Some(arguments)) => {
+        (None, Some(output), true, Some(target), Some(arguments), None) => {
             let captured_value = capture_catbash(output, false)?;
             let modified_value = execute_arguments(&captured_value, arguments, false)?;
             write_to_file(&modified_value, target)?;
         }
-        (Some(input), Some(output), true, None, Some(arguments)) => {
+        (Some(input), Some(output), true, None, Some(arguments), None) => {
             write_to_file(input, output)?;
             let captured_value = capture_catbash(output, false)?;
             let _modified_value = execute_arguments(&captured_value, arguments, true)?;
         }
-        (Some(input), Some(output), true, Some(target), Some(arguments)) => {
+        (Some(input), Some(output), true, Some(target), Some(arguments), None) => {
             write_to_file(input, output)?;
             let captured_value = capture_catbash(output, false)?;
             let modified_value = execute_arguments(&captured_value, arguments, false)?;
+            write_to_file(&modified_value, target)?;
+        }
+        (None, Some(output), true, None, None, Some(arguments)) => {
+            let captured_value = capture_catbash(output, false)?;
+            let actual_arguments = read_from_file(arguments)?;
+            let _modified_value = execute_arguments(&captured_value, &actual_arguments, true)?;
+        }
+        (None, Some(output), true, Some(target), None, Some(arguments)) => {
+            let captured_value = capture_catbash(output, false)?;
+            let actual_arguments = read_from_file(arguments)?;
+            let modified_value = execute_arguments(&captured_value, &actual_arguments, false)?;
+            write_to_file(&modified_value, target)?;
+        }
+        (Some(input), Some(output), true, None, None, Some(arguments)) => {
+            write_to_file(input, output)?;
+            let captured_value = capture_catbash(output, false)?;
+            let actual_arguments = read_from_file(arguments)?;
+            let _modified_value = execute_arguments(&captured_value, &actual_arguments, true)?;
+        }
+        (Some(input), Some(output), true, Some(target), None, Some(arguments)) => {
+            write_to_file(input, output)?;
+            let captured_value = capture_catbash(output, false)?;
+            let actual_arguments = read_from_file(arguments)?;
+            let modified_value = execute_arguments(&captured_value, &actual_arguments, false)?;
             write_to_file(&modified_value, target)?;
         }
         _ => todo!(),
@@ -276,6 +321,18 @@ fn write_to_file(content: &str, dest: &str) -> io::Result<()> {
     file.write_all(content.as_bytes())?;
 
     Ok(())
+}
+
+fn read_from_file(path: &str) -> Result<String, Box<dyn Error>> {
+    if !Path::new(path).exists() {
+        return Err("File not found in given path".into());
+    }
+
+    let content = fs::read(path)?;
+
+    let output = String::from_utf8_lossy(&content);
+
+    Ok(output.to_string())
 }
 
 fn delete_file(path: &str) -> io::Result<()> {
