@@ -54,7 +54,7 @@ struct Args {
 
     // Positional arguments (non-flag arguments)
     #[arg(help = "Files to process with default behavior. Only 1 is expected for now")]
-    files: Vec<String>,
+    file: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -70,7 +70,8 @@ fn execute_arguments(
     arguments: &str,
     write_to_stdout: bool,
 ) -> Result<String, Box<dyn Error>> {
-    let cmd = format!(r#"echo "{captured_value}" {arguments}"#);
+    let cleaned_capture = captured_value.trim_end();
+    let cmd = format!(r#"echo "{cleaned_capture}" {arguments}"#);
 
     let output = Command::new("sh")
         .arg("-c")
@@ -79,6 +80,9 @@ fn execute_arguments(
         .expect("Failed to catbash");
 
     if !output.status.success() {
+        eprintln!("DEBUG: Command failed: {cmd}");
+        eprintln!("DEBUG: stderr: {}", String::from_utf8_lossy(&output.stderr));
+        eprintln!("DEBUG: stdout: {}", String::from_utf8_lossy(&output.stdout));
         return Err("Command exited with non-zero status".into());
     }
 
@@ -192,10 +196,10 @@ fn determine_app_mode(args: &Args) -> Result<AppMode, Box<dyn Error>> {
 
     Ok(match (has_flags, files.len()) {
         (false, 0) => AppMode::NoArgs,
-        (false, 1) => AppMode::DefaultBehavior(args.files[0].clone()),
+        (false, 1) => AppMode::DefaultBehavior(args.file[0].clone()),
         (false, n) if n > 1 => AppMode::Error(format!(
             "Too many files for default behavior: {:?}. Please use flags or provide only one file.",
-            args.files
+            args.file
         )),
         (true, 0) => AppMode::DefinedFlags,
         (true, _) => AppMode::Error(
