@@ -141,7 +141,7 @@ fn capture_catbash(path: &str, write_to_stdout: bool) -> Result<String, Box<dyn 
 
 fn has_flags_from_matches(matches: &ArgMatches) -> bool {
     //Regardless of if files is recognized as a non-flag argument or not, which seems to vary on the day, this should work.
-    matches.args_present() && !matches.contains_id("files")
+    matches.args_present() && !matches.contains_id("file")
 }
 
 fn validate_matches(matches: &ArgMatches, args_given: &Args) -> Result<(), Box<dyn Error>> {
@@ -185,7 +185,7 @@ fn determine_app_mode(args: &Args) -> Result<AppMode, Box<dyn Error>> {
 
     let has_flags = has_flags_from_matches(&matches);
     let files: Vec<String> = matches
-        .get_many::<String>("files")
+        .get_many::<String>("file")
         .unwrap_or_default()
         .cloned()
         .collect();
